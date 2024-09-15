@@ -1,76 +1,123 @@
 ﻿using API_first_project.Models;
-using API_first_project.Repositories;
+using API_first_project.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System;
 
 namespace API_first_project.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class EmployeesController : ControllerBase
+    public class EmployeeController : ControllerBase
     {
-        private readonly IEmployeeRepository _employeeRepository;
+        private readonly IEmployeeService _employeeService;
+        private readonly IErrorHandlingService<string> _errorHandlingService;
 
-        public EmployeesController(IEmployeeRepository employeeRepository)
+        public EmployeeController(IEmployeeService employeeService, IErrorHandlingService<string> errorHandlingService)
         {
-            _employeeRepository = employeeRepository;
+            _employeeService = employeeService;
+            _errorHandlingService = errorHandlingService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Employee>>> GetAll()
+        public async Task<ActionResult<IEnumerable<Employee>>> GetAllEmployees()
         {
-            var employees = await _employeeRepository.GetAll();
-            return Ok(employees);
+            try
+            {
+                var employees = await _employeeService.GetAllEmployeesAsync();
+                return Ok(employees);
+            }
+            catch (Exception ex)
+            {
+                _errorHandlingService.SetError(ex.Message);
+                return StatusCode(500, _errorHandlingService.GetError()); // Internal Server Error
+            }
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Employee>> GetById(int id)
+        public async Task<ActionResult<Employee>> GetEmployeeById(int id)
         {
-            var employee = await _employeeRepository.GetById(id);
-            if (employee == null)
+            try
             {
-                return NotFound();
+                var employee = await _employeeService.GetEmployeeByIdAsync(id);
+                if (employee == null)
+                {
+                    return NotFound(); // 404 Not Found
+                }
+                return Ok(employee);
             }
-            return Ok(employee);
+            catch (Exception ex)
+            {
+                _errorHandlingService.SetError(ex.Message);
+                return StatusCode(500, _errorHandlingService.GetError()); // Internal Server Error
+            }
         }
 
         [HttpPost]
-        public async Task<ActionResult> Add(Employee employee)
+        public async Task<ActionResult> AddEmployee(Employee employee)
         {
-            await _employeeRepository.Add(employee);
-            return CreatedAtAction(nameof(GetById), new { id = employee.Id }, employee);
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState); // 400 Bad Request for validation errors
+                }
+
+                await _employeeService.AddEmployeeAsync(employee);
+                return CreatedAtAction(nameof(GetEmployeeById), new { id = employee.Id }, employee);
+            }
+            catch (Exception ex)
+            {
+                _errorHandlingService.SetError(ex.Message);
+                return StatusCode(500, _errorHandlingService.GetError()); // Internal Server Error
+            }
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult> Update(int id, Employee employee)
+        public async Task<IActionResult> UpdateEmployee(int id, [FromBody] Employee employee)
         {
-            if (id != employee.Id)
+            try
             {
-                return BadRequest();
-            }
+                if (id != employee.Id)
+                {
+                    return BadRequest("Employee ID mismatch."); // 400 Bad Request
+                }
 
-            var existingEmployee = await _employeeRepository.GetById(id);
-            if (existingEmployee == null)
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState); // 400 Bad Request for validation errors
+                }
+
+                await _employeeService.UpdateEmployeeAsync(employee);
+                return NoContent(); // 204 No Content for successful update
+            }
+            catch (Exception ex)
             {
-                return NotFound();
+                _errorHandlingService.SetError(ex.Message);
+                return StatusCode(500, _errorHandlingService.GetError()); // Internal Server Error
             }
-
-            await _employeeRepository.Update(employee);
-            return NoContent();
         }
 
         [HttpDelete("{id}")]
-        public async Task<ActionResult> Delete(int id)
+        public async Task<ActionResult> DeleteEmployee(int id)
         {
-            var existingEmployee = await _employeeRepository.GetById(id);
-            if (existingEmployee == null)
+            try
             {
-                return NotFound();
-            }
+                var employee = await _employeeService.GetEmployeeByIdAsync(id);
+                if (employee == null)
+                {
+                    return NotFound(); // 404 Not Found
+                }
 
-            await _employeeRepository.Delete(id);
-            return NoContent();
+                await _employeeService.DeleteEmployeeAsync(id);
+                return NoContent(); // 204 No Content for successful deletion
+            }
+            catch (Exception ex)
+            {
+                _errorHandlingService.SetError(ex.Message);
+                return StatusCode(500, _errorHandlingService.GetError()); // Internal Server Error
+            }
         }
     }
 }

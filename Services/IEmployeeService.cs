@@ -2,9 +2,9 @@
 using API_first_project.Models;
 using System.Threading.Tasks;
 
-namespace API_first_project.Repositories
+namespace API_first_project.Services
 {
-    public interface IEmployeeRepository
+    public interface IEmployeeService
     {
         Task<IEnumerable<Employee>> GetAllEmployeesAsync();
         Task<Employee> GetEmployeeByIdAsync(int id);
